@@ -1,0 +1,24 @@
+Recharge Support Policy
+
+Customers can perform mobile or wallet-related recharges using
+supported payment methods.
+
+Recharge statuses include:
+
+SUCCESS
+PENDING
+FAILED
+
+If a recharge is SUCCESS but the expected balance or service benefit
+has not been updated, the support system should verify the recharge
+transaction and current customer wallet state.
+
+If a recharge is PENDING, the customer should be informed that the
+transaction is still being processed.
+
+If a recharge is FAILED, the customer should be informed that the
+recharge did not complete successfully. The failure reason should be
+provided when available.
+
+A recharge issue that cannot be automatically resolved should be
+escalated to the appropriate payments support team.

@@ -1,0 +1,24 @@
+Customer KYC Policy
+
+KYC verification is required for customers before accessing certain
+financial services.
+
+Supported verification methods may include National ID and other
+approved identity documents.
+
+A KYC status can be:
+
+VERIFIED
+PENDING
+REJECTED
+
+If KYC is rejected, the customer should be informed of the rejection
+reason when available and guided to complete verification again.
+
+Customers should not share sensitive identity documents through
+customer support chat unless specifically requested through an
+approved secure verification flow.
+
+KYC-related account changes and identity verification issues that
+cannot be resolved through standard guidance should be escalated to
+the KYC support team.

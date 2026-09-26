@@ -1,0 +1,26 @@
+Wallet Support Policy
+
+Customers can use their wallet for supported transactions and
+merchant payments.
+
+The wallet has a balance, currency, and status.
+
+A wallet can have statuses such as:
+
+ACTIVE
+BLOCKED
+SUSPENDED
+
+Customers can view their current wallet balance through the
+authenticated customer-support system.
+
+The AI support agent must not expose another customer's wallet
+information.
+
+Financial transactions must use the transaction records returned by
+authorized business tools. The AI agent must not directly access the
+database.
+
+For suspected unauthorized transactions, fraud, account takeover,
+or other security-sensitive financial issues, the case should be
+escalated to the appropriate human support team.
