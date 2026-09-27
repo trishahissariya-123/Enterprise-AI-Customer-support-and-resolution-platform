@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from langchain_core.messages import HumanMessage
@@ -32,6 +32,7 @@ class SupportChatResponse(BaseModel):
 @router.post("/chat", response_model=SupportChatResponse)
 async def support_chat(
     request: SupportChatRequest,
+        request_app: Request,
     current_customer: Customer = Depends(get_current_customer),
     db: AsyncSession = Depends(get_db),
 ):
@@ -89,17 +90,23 @@ async def support_chat(
         )
 
         # Create agent
-        agent = create_agent_graph(db)
+        checkpointer = request_app.app.state.agent_checkpointer
+        agent = create_agent_graph(db, checkpointer=checkpointer)
 
         # Run agent
         result = await agent.ainvoke(
             {
                 "customer_id": current_customer.customer_id,
-                "intents": [],
+                "intent": None,
                 "triage_reason": None,
                 "tool_iterations": 0,
                 "messages": messages,
-            }
+            },
+            config={
+                "configurable": {
+                    "thread_id": conversation.conversation_id
+                }
+            },
         )
 
         final_message = result["messages"][-1]

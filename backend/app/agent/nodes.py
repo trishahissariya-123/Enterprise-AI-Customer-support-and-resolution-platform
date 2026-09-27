@@ -4,7 +4,7 @@ from backend.app.agent.schemas import TriageResult
 from backend.app.agent.state import AgentState
 from backend.app.llm.provider import get_llm
 from backend.app.tools.registry import create_all_tools
-
+from langchain_core.messages import AIMessage
 
 SYSTEM_PROMPT = """
 You are an AI customer support agent for a telecom and digital wallet platform.
@@ -223,4 +223,16 @@ Knowledge base results:
         }
 
     return knowledge_node
+
+async def agent_limit_handler(state: AgentState):
+    response = AIMessage(
+        content=(
+            "I’m sorry, but I couldn’t complete your request automatically. "
+            "Please try again, or contact customer support for further assistance."
+        )
+    )
+
+    return {
+        "messages": [response]
+    }
 

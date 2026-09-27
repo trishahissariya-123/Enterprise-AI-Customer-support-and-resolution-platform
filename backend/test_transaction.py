@@ -1,26 +1,23 @@
+
 import asyncio
 
-from backend.app.llm.provider import get_llm
+from backend.app.agent.checkpointer import get_checkpointer
 
 
 async def main():
 
-    print("Creating Azure OpenAI LLM...")
+    checkpointer_cm = get_checkpointer()
 
-    llm = get_llm()
+    async with checkpointer_cm as checkpointer:
 
-    print("Sending request...")
+        await checkpointer.setup()
 
-    response = await llm.ainvoke(
-        "Explain what a digital wallet is in one sentence."
-    )
-
-    print("\n==============================")
-    print("AZURE OPENAI RESPONSE")
-    print("==============================")
-
-    print(response.content)
+        print("LangGraph PostgreSQL checkpointer OK")
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+
+    asyncio.run(
+        main(),
+        loop_factory=asyncio.SelectorEventLoop,
+    )

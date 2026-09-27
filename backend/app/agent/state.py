@@ -13,3 +13,4 @@ class AgentState(MessagesState):
     customer_id: str | None = None
     intent: str
     triage_reason: str | None = None
+    tool_iterations: int= 0
