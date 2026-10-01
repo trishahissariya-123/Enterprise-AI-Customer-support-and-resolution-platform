@@ -43,32 +43,68 @@ def create_agent_node(db):
     llm = get_llm().bind_tools(tools)
 
     async def agent_node(state: AgentState):
-
         intent = state.get("intent")
 
+        investigation_status = state.get("investigation_status")
+        investigation_reason = state.get("investigation_reason")
+
+        investigation_instruction = ""
+
+        if investigation_status:
+            investigation_instruction = f"""
+        An investigation has already been performed for this customer request.
+
+        Investigation status:
+        {investigation_status}
+
+        Investigation reason:
+        {investigation_reason}
+
+        Investigation data:
+        Transaction result:
+        {state.get("transaction_result")}
+
+        Recharge result:
+        {state.get("recharge_result")}
+        Wallet result:
+{state.get("wallet_result")}
+
+
+        Use these verified investigation results when answering the customer.
+
+        Do not contradict the investigation results.
+        Do not invent additional transaction or recharge information.
+
+        If the investigation indicates NEEDS_SUPPORT, explain the issue clearly
+        and tell the customer that further support is required.
+
+        If the investigation indicates RESOLVED, clearly explain the verified result.
+        """
+
         intent_instruction = f"""
-The request has been classified as:
+        The request has been classified as:
 
-{intent}
+        {intent}
 
-Use this classification as routing context only.
+        Use this classification as routing context only.
 
-You are responsible for deciding which tools are
-actually required to answer the customer's request.
+        You are responsible for deciding which tools are
+        actually required to answer the customer's request.
 
-Rules:
+        Rules:
 
-1. Use authenticated customer tools for customer-specific information.
-2. Never guess customer-specific information.
-3. You may call multiple tools when the question requires multiple
-   pieces of information.
-4. After receiving a tool result, determine whether another tool
-   is required.
-5. Stop calling tools when you have enough information to answer.
-6. Do not call unnecessary tools.
-7. Never ask the customer for their customer ID if authenticated
-   customer context is available.
-"""
+        1. Use authenticated customer tools for customer-specific information.
+        2. Never guess customer-specific information.
+        3. You may call multiple tools when the question requires multiple
+           pieces of information.
+        4. After receiving a tool result, determine whether another tool is required.
+        5. Stop calling tools when you have enough information to answer.
+        6. Do not call unnecessary tools.
+        7. Never ask the customer for their customer ID if authenticated
+           customer context is available.
+
+        {investigation_instruction}
+        """
 
         messages = [
             SystemMessage(content=SYSTEM_PROMPT),

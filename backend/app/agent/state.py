@@ -1,3 +1,5 @@
+from typing import Any
+
 from langgraph.graph import MessagesState
 
 
@@ -14,3 +16,13 @@ class AgentState(MessagesState):
     intent: str
     triage_reason: str | None = None
     tool_iterations: int= 0
+    # Investigation state
+    investigation_required: bool = False
+    investigation_type: str | None = None
+
+    transaction_result: dict[str, Any] | None = None
+    recharge_result: dict[str, Any] | None = None
+    wallet_result: dict[str, Any] | None = None
+
+    investigation_status: str | None = None
+    investigation_reason: str | None = None

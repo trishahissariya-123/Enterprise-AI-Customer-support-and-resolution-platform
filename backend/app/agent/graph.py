@@ -10,12 +10,52 @@ from backend.app.agent.state import AgentState
 from backend.app.tools.registry import create_all_tools
 from backend.app.agent.intent import Intent
 from backend.app.agent.policy import DEFAULT_AGENT_POLICY
-
+from backend.app.agent.investigation import (
+    create_transaction_investigation_node,
+    create_recharge_investigation_node,
+    investigation_decision_node,
+    create_wallet_investigation_node,
+)
 
 def route_after_triage(state: AgentState):
     intent = state.get("intent")
 
-    if intent == Intent.KNOWLEDGE.value:
+    messages = state.get("messages", [])
+
+    latest_message = ""
+    for message in reversed(messages):
+        if getattr(message, "type", None) == "human":
+            latest_message = message.content.lower()
+            break
+
+    # Complex recharge/transaction issue requiring
+    # transaction + recharge correlation.
+    investigation_keywords = [
+        "wallet was debited",
+        "wallet debited",
+        "money was deducted",
+        "money deducted",
+        "amount deducted",
+        "recharge didn't happen",
+        "recharge did not happen",
+        "recharge failed",
+        "recharge pending",
+        "charged but",
+        "debited but",
+    ]
+
+    requires_investigation = any(
+        keyword in latest_message
+        for keyword in investigation_keywords
+    )
+
+    if requires_investigation and intent in {
+        "RECHARGE",
+        "TRANSACTION",
+    }:
+        return "investigation"
+
+    if intent == "KNOWLEDGE":
         return "knowledge"
 
     return "agent"
@@ -52,7 +92,9 @@ def create_agent_graph(db, checkpointer=None):
     agent_node = create_agent_node(db)
     tool_node = ToolNode(tools)
     knowledge_workflow = create_knowledge_node(db)
-
+    transaction_investigation = create_transaction_investigation_node(db)
+    recharge_investigation = create_recharge_investigation_node(db)
+    wallet_investigation = create_wallet_investigation_node(db)
     async def safe_tool_node(state: AgentState):
         try:
             result = await tool_node.ainvoke(state)
@@ -84,7 +126,24 @@ def create_agent_graph(db, checkpointer=None):
     graph.add_node("tools", safe_tool_node)
     graph.add_node("knowledge", knowledge_workflow)
     graph.add_node("limit_handler", agent_limit_handler)
+    graph.add_node(
+        "transaction_investigation",
+        transaction_investigation,
+    )
+    graph.add_node(
+        "wallet_investigation",
+        wallet_investigation,
+    )
 
+    graph.add_node(
+        "recharge_investigation",
+        recharge_investigation,
+    )
+
+    graph.add_node(
+        "investigation_decision",
+        investigation_decision_node,
+    )
 
     # START → TRIAGE
     graph.add_edge(
@@ -98,6 +157,7 @@ def create_agent_graph(db, checkpointer=None):
         route_after_triage,
         {
             "knowledge": "knowledge",
+            "investigation": "transaction_investigation",
             "agent": "agent",
         },
     )
@@ -133,6 +193,24 @@ def create_agent_graph(db, checkpointer=None):
     graph.add_edge(
         "limit_handler",
         END,
+    )
+    graph.add_edge(
+        "transaction_investigation",
+        "recharge_investigation",
+    )
+
+    graph.add_edge(
+        "recharge_investigation",
+        "wallet_investigation",
+    )
+    graph.add_edge(
+        "wallet_investigation",
+        "investigation_decision",
+    )
+
+    graph.add_edge(
+        "investigation_decision",
+        "agent",
     )
 
 
