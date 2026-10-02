@@ -4,7 +4,8 @@ from langgraph.types import Command
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from langchain_core.messages import HumanMessage
-
+from backend.app.infrastructure.redis.client import redis_client
+from backend.app.infrastructure.redis.rate_limiter import RateLimiter
 from backend.app.agent.context import set_current_customer_id
 from backend.app.agent.graph import create_agent_graph
 from backend.app.api.dependencies import get_current_customer, get_db
@@ -37,6 +38,11 @@ class SupportChatResponse(BaseModel):
     conversation_id: str | None = None
     approval_reason: str | None = None
 
+rate_limiter = RateLimiter(
+    redis_client=redis_client,
+    max_requests=10,
+    window_seconds=60,
+)
 
 @router.post("/chat", response_model=SupportChatResponse)
 async def support_chat(
@@ -48,7 +54,18 @@ async def support_chat(
     context_token = set_current_customer_id(
         current_customer.customer_id
     )
+    allowed = await rate_limiter.is_allowed(
+        current_customer.customer_id
+    )
 
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                "Too many support requests. "
+                "Please try again later."
+            ),
+        )
     try:
         # Conversation repository
         conversation_repository = ConversationRepository(db)
