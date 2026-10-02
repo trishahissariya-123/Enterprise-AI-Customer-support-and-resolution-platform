@@ -75,3 +75,11 @@ class ConversationService:
     ) -> list[ConversationMessage]:
 
         return await self.repository.get_messages(conversation)
+
+    async def get_conversation(
+            self,
+            conversation_id: str,
+    ) -> Conversation | None:
+        return await self.repository.get_by_conversation_id(
+            conversation_id
+        )

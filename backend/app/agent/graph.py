@@ -19,15 +19,25 @@ from backend.app.agent.investigation import (
 from backend.app.agent.investigation_supervisor import (
     investigation_supervisor,
 )
+from backend.app.agent.ticket_decision import (
+    ticket_decision_node,
+)
+from backend.app.agent.human_approval import (
+    human_approval_node,
+)
 
 def route_after_triage(state: AgentState):
+    intent=state.get("intent")
     investigation_required = state.get(
         "investigation_required",
         False,
     )
+    if intent=="SUPPORT_TICKET":
+        return "human_approval"
 
     if investigation_required:
         return "investigation_supervisor"
+
 
     if state.get("intent") == "KNOWLEDGE":
         return "knowledge"
@@ -48,6 +58,18 @@ def route_after_agent(state: AgentState):
         return "limit_reached"
 
     return "tool_guard"
+def route_after_ticket_decision(
+    state: AgentState,
+):
+    action = state.get(
+        "ticket_action",
+        "ASK_CUSTOMER",
+    )
+
+    if action == "CREATE_TICKET":
+        return "human_approval"
+
+    return "agent"
 
 def route_after_investigation_supervisor(
     state: AgentState,
@@ -140,6 +162,14 @@ def create_agent_graph(db, checkpointer=None):
         "investigation_supervisor",
         investigation_supervisor,
     )
+    graph.add_node(
+        "ticket_decision",
+        ticket_decision_node,
+    )
+    graph.add_node(
+        "human_approval",
+        human_approval_node,
+    )
     # START → TRIAGE
     graph.add_edge(
         START,
@@ -153,6 +183,7 @@ def create_agent_graph(db, checkpointer=None):
         {
             "knowledge": "knowledge",
             "investigation_supervisor": "investigation_supervisor",
+            "human_approval": "human_approval",
             "agent": "agent",
         },
     )
@@ -212,9 +243,19 @@ def create_agent_graph(db, checkpointer=None):
         "wallet_investigation",
         "investigation_decision",
     )
-
     graph.add_edge(
         "investigation_decision",
+        "ticket_decision",
+    )
+    graph.add_conditional_edges(
+        "ticket_decision",
+        route_after_ticket_decision,{
+            "human_approval": "human_approval",
+            "agent":"agent",
+        },
+    )
+    graph.add_edge(
+        "human_approval",
         "agent",
     )
 

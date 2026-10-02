@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-
+from typing import Literal
 from backend.app.agent.intent import Intent
 
 
@@ -23,4 +23,21 @@ class TriageResult(BaseModel):
             "Examples: transaction_recharge, merchant_payment, "
             "wallet_transaction, or None."
         ),
+    )
+
+class TicketDecision(BaseModel):
+    action: Literal[
+        "RESOLVED",
+        "ASK_CUSTOMER",
+        "CREATE_TICKET",
+    ] = Field(
+        description=(
+            "Determines what should happen after investigation."
+        )
+    )
+
+    reason: str = Field(
+        description=(
+            "Short explanation for the selected action."
+        )
     )

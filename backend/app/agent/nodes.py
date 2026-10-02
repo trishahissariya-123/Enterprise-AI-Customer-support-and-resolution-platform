@@ -220,25 +220,33 @@ Important:
 
 Select ONLY ONE intent.
 Investigation rules:
+Investigation rules:
 
-Set investigation_required=true when the customer reports
-a customer-specific financial inconsistency that requires
-verification across business systems.
+Set investigation_required=true ONLY when the customer reports
+a specific financial inconsistency that requires verification
+across multiple business systems.
 
 Examples:
 - wallet debited but recharge not received
 - charged for recharge but recharge is missing
 - transaction succeeded but expected service was not delivered
 - money deducted but transaction/recharge outcome is unclear
-- customer reports a possible mismatch between payment and recharge
+- customer reports a mismatch between payment and recharge
 
-Set investigation_required=false for:
-- simple wallet balance questions
-- simple transaction history questions
-- simple recharge status questions when direct lookup is sufficient
-- general policy questions
-- knowledge-base questions
-- greetings
+Set investigation_required=false when:
+- the customer explicitly asks to create a support ticket
+- the customer asks for human support without reporting a
+  specific financial inconsistency
+- the customer asks to check or update an existing support ticket
+- the customer asks a simple transaction status question
+- the customer asks a simple recharge status question
+- the customer asks for wallet balance
+- the customer asks a general policy or FAQ question
+- the customer sends a greeting
+
+Important:
+A request for human support or a support ticket by itself does
+NOT mean financial investigation is required.
 
 Investigation type rules:
 
@@ -260,6 +268,10 @@ Use:
 
 - None:
   When investigation_required=false.
+
+
+
+
   
 Customer message:
 {message.content}

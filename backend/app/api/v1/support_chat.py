@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, HTTPException
+from typing import Literal
+from langgraph.types import Command
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from langchain_core.messages import HumanMessage
@@ -24,9 +26,16 @@ class SupportChatRequest(BaseModel):
     message: str
     conversation_id: str | None = None
 
+class SupportApprovalRequest(BaseModel):
+    conversation_id: str
+    decision: Literal["approve", "reject"]
+
 
 class SupportChatResponse(BaseModel):
     response: str
+    requires_human_approval: bool = False
+    conversation_id: str | None = None
+    approval_reason: str | None = None
 
 
 @router.post("/chat", response_model=SupportChatResponse)
@@ -65,6 +74,7 @@ async def support_chat(
             conversation=conversation,
             content=request.message,
         )
+        await db.commit()
 
         # Convert database history into LangChain messages
         from langchain_core.messages import (
@@ -108,21 +118,121 @@ async def support_chat(
                 }
             },
         )
+        print("========== GRAPH RESULT ==========")
+        print(result)
+
+        if "__interrupt__" in result:
+            interrupt_data = result["__interrupt__"][0]
+
+            return {
+                "response": interrupt_data.value["message"],
+                "requires_human_approval": True,
+                "conversation_id": conversation.conversation_id,
+                "approval_reason": interrupt_data.value["reason"],
+            }
 
         final_message = result["messages"][-1]
 
-        # Save AI response
         await conversation_service.save_assistant_message(
             conversation=conversation,
             content=final_message.content,
         )
 
-        # Commit conversation + messages
         await db.commit()
 
-        return SupportChatResponse(
-            response=final_message.content
+        return {
+            "response": final_message.content,
+            "requires_human_approval": False,
+            "conversation_id": conversation.conversation_id,
+        }
+
+    finally:
+        from backend.app.agent.context import current_customer_id
+
+        current_customer_id.reset(context_token)
+
+
+@router.post("/approval", response_model=SupportChatResponse)
+async def support_approval(
+    request: SupportApprovalRequest,
+    request_app: Request,
+    current_customer: Customer = Depends(get_current_customer),
+    db: AsyncSession = Depends(get_db),
+):
+    context_token = set_current_customer_id(
+        current_customer.customer_id
+    )
+
+    try:
+        conversation_repository = ConversationRepository(db)
+        conversation_service = ConversationService(
+            conversation_repository
         )
+
+        conversation = await conversation_service.get_conversation(
+            conversation_id=request.conversation_id,
+        )
+
+        if conversation is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Conversation not found",
+            )
+
+        if conversation.customer_id != current_customer.id:
+            raise HTTPException(
+                status_code=403,
+                detail="Conversation does not belong to the authenticated customer",
+            )
+
+        if conversation.customer_id != current_customer.id:
+            raise HTTPException(
+                status_code=403,
+                detail="Conversation does not belong to the authenticated customer",
+            )
+
+        checkpointer = request_app.app.state.agent_checkpointer
+
+        agent = create_agent_graph(
+            db,
+            checkpointer=checkpointer,
+        )
+
+        result = await agent.ainvoke(
+            Command(
+                resume=request.decision
+            ),
+            config={
+                "configurable": {
+                    "thread_id": conversation.conversation_id
+                }
+            },
+        )
+
+        if "__interrupt__" in result:
+            interrupt_data = result["__interrupt__"][0]
+
+            return {
+                "response": interrupt_data.value["message"],
+                "requires_human_approval": True,
+                "conversation_id": conversation.conversation_id,
+                "approval_reason": interrupt_data.value["reason"],
+            }
+
+        final_message = result["messages"][-1]
+
+        await conversation_service.save_assistant_message(
+            conversation=conversation,
+            content=final_message.content,
+        )
+
+        await db.commit()
+
+        return {
+            "response": final_message.content,
+            "requires_human_approval": False,
+            "conversation_id": conversation.conversation_id,
+        }
 
     finally:
         from backend.app.agent.context import current_customer_id

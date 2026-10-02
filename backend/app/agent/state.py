@@ -27,3 +27,5 @@ class AgentState(MessagesState):
     investigation_status: str | None = None
     investigation_reason: str | None = None
     allow_write_tools: bool = False
+    ticket_action: str | None
+    ticket_reason: str | None
