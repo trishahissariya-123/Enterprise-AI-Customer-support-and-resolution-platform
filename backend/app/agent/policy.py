@@ -9,6 +9,7 @@ class AgentExecutionPolicy:
     """
 
     max_tool_iterations: int = 5
+    allow_write_tools: bool = False
 
 
 DEFAULT_AGENT_POLICY = AgentExecutionPolicy()

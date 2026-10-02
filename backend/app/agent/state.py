@@ -19,10 +19,11 @@ class AgentState(MessagesState):
     # Investigation state
     investigation_required: bool = False
     investigation_type: str | None = None
-
+    investigation_route: str | None
     transaction_result: dict[str, Any] | None = None
     recharge_result: dict[str, Any] | None = None
     wallet_result: dict[str, Any] | None = None
 
     investigation_status: str | None = None
     investigation_reason: str | None = None
+    allow_write_tools: bool = False

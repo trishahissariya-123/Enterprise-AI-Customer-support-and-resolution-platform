@@ -38,11 +38,31 @@ Available customer support capabilities include:
 
 def create_agent_node(db):
 
-    tools = create_all_tools(db)
+    all_tools  = create_all_tools(db)
+    read_tools = [
+        tool
+        for tool in all_tools
+        if tool.name != "create_support_ticket"
+    ]
 
-    llm = get_llm().bind_tools(tools)
+    write_tools = [
+        tool
+        for tool in all_tools
+        if tool.name == "create_support_ticket"
+    ]
+
 
     async def agent_node(state: AgentState):
+        allow_write_tools = state.get(
+            "allow_write_tools",
+            False,
+        )
+        if allow_write_tools:
+            tools = read_tools + write_tools
+        else:
+            tools = read_tools
+
+        llm = get_llm().bind_tools(tools)
         intent = state.get("intent")
 
         investigation_status = state.get("investigation_status")
@@ -75,10 +95,22 @@ def create_agent_node(db):
         Do not contradict the investigation results.
         Do not invent additional transaction or recharge information.
 
-        If the investigation indicates NEEDS_SUPPORT, explain the issue clearly
-        and tell the customer that further support is required.
+        If the investigation indicates NEEDS_SUPPORT:
+- Explain only what was verified.
+- Clearly state that further support is required.
+- Do not claim that an unresolved event definitely occurred.
 
-        If the investigation indicates RESOLVED, clearly explain the verified result.
+If the investigation indicates INSUFFICIENT_DATA:
+- Explain only the information that was successfully verified.
+- Clearly identify what could not be verified.
+- Do not infer that the customer's expected transaction or recharge
+  definitely failed.
+- Do not create or suggest that a support ticket was created.
+- Ask for the missing identifier or information when appropriate.
+
+If the investigation indicates RESOLVED:
+- Clearly explain the verified result.
+- Do not add unsupported conclusions.
         """
 
         intent_instruction = f"""
@@ -187,7 +219,48 @@ or requests requiring human intervention.
 Important:
 
 Select ONLY ONE intent.
+Investigation rules:
 
+Set investigation_required=true when the customer reports
+a customer-specific financial inconsistency that requires
+verification across business systems.
+
+Examples:
+- wallet debited but recharge not received
+- charged for recharge but recharge is missing
+- transaction succeeded but expected service was not delivered
+- money deducted but transaction/recharge outcome is unclear
+- customer reports a possible mismatch between payment and recharge
+
+Set investigation_required=false for:
+- simple wallet balance questions
+- simple transaction history questions
+- simple recharge status questions when direct lookup is sufficient
+- general policy questions
+- knowledge-base questions
+- greetings
+
+Investigation type rules:
+
+If investigation_required=true, select the most appropriate
+investigation_type.
+
+Use:
+
+- transaction_recharge:
+  When the customer reports a mismatch between a transaction/payment
+  and a recharge.
+
+- wallet_transaction:
+  When the customer reports a wallet debit/credit inconsistency
+  involving a transaction.
+
+- merchant_payment:
+  When the customer reports a merchant payment inconsistency.
+
+- None:
+  When investigation_required=false.
+  
 Customer message:
 {message.content}
 """
@@ -199,10 +272,13 @@ Customer message:
     print("========== TRIAGE ==========")
     print("Intent:", result.intent.value)
     print("Reason:", result.reason)
+    print("investigation_required", result.investigation_required)
 
     return {
         "intent": result.intent.value,
         "triage_reason": result.reason,
+        "investigation_required": result.investigation_required,
+        "investigation_type": result.investigation_type,
 
     }
 

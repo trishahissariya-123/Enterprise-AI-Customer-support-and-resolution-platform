@@ -1,23 +1,57 @@
+from backend.app.agent.investigation_supervisor import (
+    investigation_supervisor,
+)
 
-import asyncio
 
-from backend.app.agent.checkpointer import get_checkpointer
+def test_case(name, state):
+    result = investigation_supervisor(state)
+
+    print(f"\n{name}")
+    print("Input:", state)
+    print("Output:", result)
 
 
-async def main():
+def main():
+    test_case(
+        "Recharge investigation",
+        {
+            "investigation_required": True,
+            "investigation_type": "transaction_recharge",
+        },
+    )
 
-    checkpointer_cm = get_checkpointer()
+    test_case(
+        "Wallet transaction investigation",
+        {
+            "investigation_required": True,
+            "investigation_type": "wallet_transaction",
+        },
+    )
 
-    async with checkpointer_cm as checkpointer:
+    test_case(
+        "Merchant payment investigation",
+        {
+            "investigation_required": True,
+            "investigation_type": "merchant_payment",
+        },
+    )
 
-        await checkpointer.setup()
+    test_case(
+        "No investigation",
+        {
+            "investigation_required": False,
+            "investigation_type": None,
+        },
+    )
 
-        print("LangGraph PostgreSQL checkpointer OK")
+    test_case(
+        "Unsupported investigation",
+        {
+            "investigation_required": True,
+            "investigation_type": "unknown_workflow",
+        },
+    )
 
 
 if __name__ == "__main__":
-
-    asyncio.run(
-        main(),
-        loop_factory=asyncio.SelectorEventLoop,
-    )
+    main()

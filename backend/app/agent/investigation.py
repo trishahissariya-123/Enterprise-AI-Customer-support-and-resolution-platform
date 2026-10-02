@@ -65,10 +65,12 @@ def create_transaction_investigation_node(db: AsyncSession):
 
         for word in words:
             cleaned = word.strip(".,!?():;")
+            normalized = cleaned.upper()
 
-            if cleaned.upper().startswith("TXN-"):
-                transaction_id = cleaned.upper()
+            if normalized.startswith("TXN-") or normalized.startswith("TXN"):
+                transaction_id = normalized
                 break
+
 
         # ---------------------------------------------------------
         # Case 1: Transaction ID was provided
@@ -200,10 +202,12 @@ def create_recharge_investigation_node(db: AsyncSession):
 
         for word in words:
             cleaned = word.strip(".,!?():;")
+            normalized = cleaned.upper()
 
-            if cleaned.upper().startswith("RECH-"):
-                recharge_id = cleaned.upper()
+            if normalized.startswith("RECH-") or normalized.startswith("RECH"):
+                recharge_id = normalized
                 break
+
 
         if recharge_id is not None:
 
@@ -321,7 +325,7 @@ def create_wallet_investigation_node(db: AsyncSession):
         return {
             "wallet_result": {
                 "found": True,
-                "wallet_id": wallet.wallet_id,
+                "wallet_id": wallet.id,
                 "balance": str(wallet.balance),
                 "currency": wallet.currency,
                 "status": wallet.status,
@@ -341,6 +345,7 @@ async def investigation_decision_node(state):
                 "investigation_reason": (
                     "Customer wallet information could not be verified."
                 ),
+                "allow_write_tools": False,
             }
 
         if not transaction or not transaction.get("found"):
@@ -349,6 +354,7 @@ async def investigation_decision_node(state):
                 "investigation_reason": (
                     "Transaction information could not be verified."
                 ),
+                "allow_write_tools": False,
             }
 
         if not recharge or not recharge.get("found"):
@@ -357,6 +363,7 @@ async def investigation_decision_node(state):
                 "investigation_reason": (
                     "Recharge information could not be verified."
                 ),
+                "allow_write_tools": False,
             }
 
         transaction_status = transaction.get("status")
@@ -377,6 +384,7 @@ async def investigation_decision_node(state):
                 "investigation_reason": (
                     "The transaction amount and recharge amount do not match."
                 ),
+                "allow_write_tools": True,
             }
 
         # ---------------------------------------------------------
@@ -394,6 +402,7 @@ async def investigation_decision_node(state):
                     "provider references, so their relationship "
                     "could not be verified."
                 ),
+                "allow_write_tools": True,
             }
 
         # ---------------------------------------------------------
@@ -409,6 +418,7 @@ async def investigation_decision_node(state):
                     "The payment transaction succeeded, but the "
                     "recharge is not in a completed state."
                 ),
+                "allow_write_tools": True,
             }
 
         # ---------------------------------------------------------
@@ -424,6 +434,7 @@ async def investigation_decision_node(state):
                     "The payment transaction and recharge both "
                     "completed successfully."
                 ),
+                "allow_write_tools": False,
             }
 
         # ---------------------------------------------------------
@@ -436,6 +447,7 @@ async def investigation_decision_node(state):
                     "The payment transaction failed, so the "
                     "recharge was not successfully funded."
                 ),
+                "allow_write_tools": False,
             }
 
         # ---------------------------------------------------------
@@ -448,6 +460,7 @@ async def investigation_decision_node(state):
                     "The recharge failed and requires further "
                     "support investigation."
                 ),
+                "allow_write_tools": False,
             }
 
         # ---------------------------------------------------------
@@ -459,4 +472,5 @@ async def investigation_decision_node(state):
                 "The transaction and recharge states require "
                 "additional support investigation."
             ),
+            "allow_write_tools": True,
         }

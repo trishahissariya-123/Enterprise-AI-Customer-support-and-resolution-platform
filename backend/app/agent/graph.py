@@ -16,46 +16,20 @@ from backend.app.agent.investigation import (
     investigation_decision_node,
     create_wallet_investigation_node,
 )
+from backend.app.agent.investigation_supervisor import (
+    investigation_supervisor,
+)
 
 def route_after_triage(state: AgentState):
-    intent = state.get("intent")
-
-    messages = state.get("messages", [])
-
-    latest_message = ""
-    for message in reversed(messages):
-        if getattr(message, "type", None) == "human":
-            latest_message = message.content.lower()
-            break
-
-    # Complex recharge/transaction issue requiring
-    # transaction + recharge correlation.
-    investigation_keywords = [
-        "wallet was debited",
-        "wallet debited",
-        "money was deducted",
-        "money deducted",
-        "amount deducted",
-        "recharge didn't happen",
-        "recharge did not happen",
-        "recharge failed",
-        "recharge pending",
-        "charged but",
-        "debited but",
-    ]
-
-    requires_investigation = any(
-        keyword in latest_message
-        for keyword in investigation_keywords
+    investigation_required = state.get(
+        "investigation_required",
+        False,
     )
 
-    if requires_investigation and intent in {
-        "RECHARGE",
-        "TRANSACTION",
-    }:
-        return "investigation"
+    if investigation_required:
+        return "investigation_supervisor"
 
-    if intent == "KNOWLEDGE":
+    if state.get("intent") == "KNOWLEDGE":
         return "knowledge"
 
     return "agent"
@@ -75,6 +49,24 @@ def route_after_agent(state: AgentState):
 
     return "tool_guard"
 
+def route_after_investigation_supervisor(
+    state: AgentState,
+):
+    route = state.get(
+        "investigation_route",
+        "none",
+    )
+
+    if route == "transaction_recharge":
+        return "transaction_recharge"
+
+    if route == "wallet_transaction":
+        return "wallet_transaction"
+
+    if route == "merchant_payment":
+        return "merchant_payment"
+
+    return "agent"
 
 def increment_tool_iteration(state: AgentState):
 
@@ -144,7 +136,10 @@ def create_agent_graph(db, checkpointer=None):
         "investigation_decision",
         investigation_decision_node,
     )
-
+    graph.add_node(
+        "investigation_supervisor",
+        investigation_supervisor,
+    )
     # START → TRIAGE
     graph.add_edge(
         START,
@@ -157,7 +152,17 @@ def create_agent_graph(db, checkpointer=None):
         route_after_triage,
         {
             "knowledge": "knowledge",
-            "investigation": "transaction_investigation",
+            "investigation_supervisor": "investigation_supervisor",
+            "agent": "agent",
+        },
+    )
+    graph.add_conditional_edges(
+        "investigation_supervisor",
+        route_after_investigation_supervisor,
+        {
+            "transaction_recharge": "transaction_investigation",
+            "wallet_transaction": "transaction_investigation",
+            "merchant_payment": "agent",
             "agent": "agent",
         },
     )

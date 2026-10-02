@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
-
+from langchain_groq import ChatGroq
 load_dotenv()
 
 
@@ -19,6 +19,12 @@ def get_llm() -> BaseChatModel:
             model=os.environ["AZURE_OPENAI_DEPLOYMENT"],
             api_key=os.environ["AZURE_OPENAI_API_KEY"],
             base_url=f"{endpoint}/openai/v1",
+            temperature=0,
+        )
+    if provider == "groq":
+        return ChatGroq(
+            model=os.environ["GROQ_MODEL"],
+            api_key=os.environ["GROQ_API_KEY"],
             temperature=0,
         )
 
