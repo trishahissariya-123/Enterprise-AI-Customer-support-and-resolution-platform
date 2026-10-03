@@ -5,17 +5,17 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.app.config import get_settings
 from backend.app.database.session import get_db
 from backend.app.agent.context import set_current_customer_id
 from backend.app.repositories.customer_repository import CustomerRepository
 from backend.app.services.customer_service import CustomerService
 
 
-# JWT configuration
-SECRET_KEY = "change-this-secret-key-in-production"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60
-
+settings=get_settings()
+ACCESS_TOKEN_EXPIRE_MINUTES=settings.ACCESS_TOKEN_EXPIRE_MINUTES
+SECRET_KEY=settings.JWT_SECRET_KEY
+ALGORITHM=settings.JWT_ALGORITHM
 
 security = HTTPBearer()
 

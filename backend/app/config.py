@@ -8,6 +8,9 @@ class Settings(BaseSettings):
     REDIS_URL:str
     LANGGRAPH_CHECKPOINT_DATABASE_URL:str
     KAFKA_BOOTSTRAP_SERVERS:str
+    JWT_SECRET_KEY:str
+    JWT_ALGORITHM:str
+    ACCESS_TOKEN_EXPIRE_MINUTES:int
     model_config = SettingsConfigDict(env_file=".env",
                        env_file_encoding="utf-8",
                        extra="ignore")
