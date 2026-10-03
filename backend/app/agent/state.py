@@ -29,3 +29,10 @@ class AgentState(MessagesState):
     allow_write_tools: bool = False
     ticket_action: str | None
     ticket_reason: str | None
+
+    # LLM usage / cost tracking
+    llm_input_tokens: int = 0
+    llm_output_tokens: int = 0
+    llm_total_tokens: int = 0
+    llm_estimated_cost_usd: float = 0.0
+    llm_call_count: int = 0

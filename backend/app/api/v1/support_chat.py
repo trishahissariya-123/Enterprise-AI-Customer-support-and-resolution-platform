@@ -16,6 +16,10 @@ from backend.app.repositories.conversation_repository import (
 from backend.app.services.conversation_service import (
     ConversationService,
 )
+from backend.app.core.logging import get_logger
+from backend.app.core.request_context import get_request_id
+
+logger = get_logger(__name__)
 
 router = APIRouter(
     prefix="/support",
@@ -51,6 +55,7 @@ async def support_chat(
     current_customer: Customer = Depends(get_current_customer),
     db: AsyncSession = Depends(get_db),
 ):
+    request_id = get_request_id()
     context_token = set_current_customer_id(
         current_customer.customer_id
     )
@@ -122,6 +127,8 @@ async def support_chat(
                                    kafka_producer=request_app.app.state.kafka_producer,
                                    )
 
+
+
         # Run agent
         result = await agent.ainvoke(
             {
@@ -136,6 +143,19 @@ async def support_chat(
                     "thread_id": conversation.conversation_id
                 }
             },
+        )
+
+        logger.info(
+            "LLM usage summary | request_id=%s | "
+            "llm_call_count=%s | input_tokens=%s | "
+            "output_tokens=%s | total_tokens=%s | "
+            "estimated_cost_usd=%.8f",
+            request_id,
+            result.get("llm_call_count", 0),
+            result.get("llm_input_tokens", 0),
+            result.get("llm_output_tokens", 0),
+            result.get("llm_total_tokens", 0),
+            result.get("llm_estimated_cost_usd", 0.0),
         )
 
 

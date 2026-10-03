@@ -10,6 +10,9 @@ from backend.app.infrastructure.redis.client import redis_client
 from backend.app.infrastructure.redis.response_cache import ResponseCache
 from backend.app.core.logging import get_logger
 from backend.app.core.request_context import get_request_id
+from backend.app.core.llm_usage import (get_llm_usage,accumulate_llm_usage)
+from langchain_core.callbacks import UsageMetadataCallbackHandler
+
 logger = get_logger(__name__)
 
 SYSTEM_PROMPT = """
@@ -221,13 +224,37 @@ you MUST call create_support_ticket.
         ]
 
         response = await llm.ainvoke(messages)
+        llm_usage = get_llm_usage(
+            response=response,
+            model=llm.model_name
+            if hasattr(llm, "model_name")
+            else "unknown",
+        )
+        usage_update = accumulate_llm_usage(
+            state,
+            llm_usage,
+        )
+
+        logger.info(
+            "LLM completed | request_id=%s | model=%s | "
+            "input_tokens=%s | output_tokens=%s | total_tokens=%s | "
+            "estimated_cost_usd=%.8f",
+            request_id,
+            llm_usage["model"],
+            llm_usage["input_tokens"],
+            llm_usage["output_tokens"],
+            llm_usage["total_tokens"],
+            llm_usage["estimated_cost_usd"],
+        )
+
         logger.info(
             "Agent completed | request_id=%s | tool_calls=%s",
             request_id,
             len(getattr(response, "tool_calls", []) or []),
         )
         return {
-            "messages": [response]
+            "messages": [response],
+            **usage_update,
         }
 
     return agent_node
@@ -238,7 +265,7 @@ async def triage_node(state: AgentState):
     request_id = get_request_id()
 
     llm = get_llm()
-
+    usage_callback = UsageMetadataCallbackHandler()
     structured_llm = llm.with_structured_output(TriageResult)
 
     message = state["messages"][-1]
@@ -359,7 +386,32 @@ Customer message:
 """
 
     result = await structured_llm.ainvoke(
-        [SystemMessage(content=prompt)]
+        [SystemMessage(content=prompt)],
+        config={
+            "callbacks": [usage_callback],
+        },
+    )
+
+    llm_usage = get_llm_usage(
+        model=llm.model_name
+        if hasattr(llm, "model_name")
+        else "unknown",
+        usage_metadata=usage_callback.usage_metadata,
+    )
+    logger.info(
+        "LLM completed | request_id=%s | model=%s | "
+        "input_tokens=%s | output_tokens=%s | total_tokens=%s | "
+        "estimated_cost_usd=%.8f | operation=triage",
+        request_id,
+        llm_usage["model"],
+        llm_usage["input_tokens"],
+        llm_usage["output_tokens"],
+        llm_usage["total_tokens"],
+        llm_usage["estimated_cost_usd"],
+    )
+    usage_update = accumulate_llm_usage(
+        state,
+        llm_usage,
     )
 
     logger.info(
@@ -376,6 +428,7 @@ Customer message:
         "triage_reason": result.reason,
         "investigation_required": result.investigation_required,
         "investigation_type": result.investigation_type,
+        **usage_update,
 
     }
 
