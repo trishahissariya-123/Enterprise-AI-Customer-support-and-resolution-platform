@@ -1,38 +1,32 @@
 import asyncio
 
-from backend.app.infrastructure.redis.client import redis_client
-from backend.app.infrastructure.redis.rate_limiter import RateLimiter
+from backend.app.infrastructure.kafka.producer import KafkaEventProducer
 
 
 async def main():
-    limiter = RateLimiter(
-        redis_client=redis_client,
-        max_requests=3,
-        window_seconds=10,
+
+    producer = KafkaEventProducer(
+        bootstrap_servers="localhost:9092"
     )
 
-    test_customer_id = "RATE_TEST_CUSTOMER"
+    try:
+        await producer.start()
 
-    # Clean up any previous test
-    await redis_client.delete(
-        f"rate_limit:support:{test_customer_id}"
-    )
+        event = {
+            "event_type": "TEST_EVENT",
+            "customer_id": "CUST1001",
+            "message": "Kafka integration test",
+        }
 
-    for i in range(1, 6):
-        allowed = await limiter.is_allowed(
-            test_customer_id
+        await producer.publish(
+            topic="support-events",
+            event=event,
         )
 
-        print(
-            f"Request {i}: "
-            f"{'ALLOWED' if allowed else 'BLOCKED'}"
-        )
+        print("Kafka event published successfully")
 
-    await redis_client.delete(
-        f"rate_limit:support:{test_customer_id}"
-    )
-
-    await redis_client.aclose()
+    finally:
+        await producer.stop()
 
 
 if __name__ == "__main__":

@@ -2,9 +2,12 @@ from langchain_core.messages import SystemMessage
 
 from backend.app.agent.schemas import TriageResult
 from backend.app.agent.state import AgentState
+from backend.app.infrastructure.redis import response_cache
 from backend.app.llm.provider import get_llm
 from backend.app.tools.registry import create_all_tools
 from langchain_core.messages import AIMessage
+from backend.app.infrastructure.redis.client import redis_client
+from backend.app.infrastructure.redis.response_cache import ResponseCache
 
 SYSTEM_PROMPT = """
 You are an AI customer support agent for a telecom and digital wallet platform.
@@ -36,9 +39,9 @@ Available customer support capabilities include:
 
 
 
-def create_agent_node(db):
+def create_agent_node(db,  kafka_producer=None,):
 
-    all_tools  = create_all_tools(db)
+    all_tools  = create_all_tools(db, kafka_producer,)
     read_tools = [
         tool
         for tool in all_tools
@@ -119,6 +122,40 @@ If the investigation indicates RESOLVED:
         {intent}
 
         Use this classification as routing context only.
+Approval context:
+
+If the state indicates that human approval has already been granted
+for ticket creation, the ticket must now be created.
+
+When:
+- allow_write_tools=true
+- ticket_action=CREATE_TICKET
+
+you MUST call the create_support_ticket tool.
+
+Do not ask the customer for a transaction ID or additional information
+if the customer's original request already provides enough information
+to create a general support ticket.
+
+Use the customer's original request to construct:
+- category
+- priority
+- subject
+- description
+- assigned_team
+
+After the create_support_ticket tool successfully returns a created
+ticket, respond to the customer with the ticket details.
+
+Never claim that a ticket was created unless the tool actually returns
+created=true.
+Approval context:
+
+allow_write_tools = {state.get("allow_write_tools", False)}
+ticket_action = {state.get("ticket_action")}
+
+If allow_write_tools=true and ticket_action=CREATE_TICKET,
+you MUST call create_support_ticket.
 
         You are responsible for deciding which tools are
         actually required to answer the customer's request.
@@ -303,10 +340,28 @@ def create_knowledge_node(db):
         for tool in tools
         if tool.name == "search_knowledge_base"
     )
+    response_cache = ResponseCache(
+        redis_client=redis_client,
+        ttl_seconds=300,
+    )
 
     async def knowledge_node(state: AgentState):
 
         query = state["messages"][-1].content
+        # Check Redis cache first
+        cached_response = await response_cache.get(query)
+
+        if cached_response is not None:
+            print("========== KNOWLEDGE CACHE ==========")
+            print("Cache HIT")
+
+            return {
+                "messages": [
+                    AIMessage(content=cached_response)
+                ]
+            }
+        print("========== KNOWLEDGE CACHE ==========")
+        print("Cache MISS")
 
         result = await knowledge_tool.ainvoke(
             {
@@ -341,6 +396,13 @@ Knowledge base results:
                 SystemMessage(content=prompt)
             ]
         )
+        # Store the final answer in Redis
+        await response_cache.set(
+            query,
+            response.content,
+        )
+
+        print("Response stored in Redis cache")
 
         return {
             "messages": [response]

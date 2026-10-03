@@ -23,7 +23,7 @@ from backend.app.tools.support_ticket_tools import (
 from backend.app.tools.knowledge_tools import create_knowledge_tools
 
 
-def create_all_tools(db: AsyncSession):
+def create_all_tools(db: AsyncSession, kafka_producer=None,):
 
     tools = []
 
@@ -36,7 +36,7 @@ def create_all_tools(db: AsyncSession):
     tools.extend(create_recharge_history_tools(db))
     tools.extend(create_merchant_payment_tools(db))
     tools.extend(create_merchant_payment_history_tools(db))
-    tools.extend(create_support_ticket_tools(db))
+    tools.extend(create_support_ticket_tools(db, kafka_producer,))
     tools.extend(create_knowledge_tools(db))
 
     return tools

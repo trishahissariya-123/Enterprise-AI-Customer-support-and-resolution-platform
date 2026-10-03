@@ -118,7 +118,9 @@ async def support_chat(
 
         # Create agent
         checkpointer = request_app.app.state.agent_checkpointer
-        agent = create_agent_graph(db, checkpointer=checkpointer)
+        agent = create_agent_graph(db, checkpointer=checkpointer,
+                                   kafka_producer=request_app.app.state.kafka_producer,
+                                   )
 
         # Run agent
         result = await agent.ainvoke(
@@ -213,6 +215,7 @@ async def support_approval(
         agent = create_agent_graph(
             db,
             checkpointer=checkpointer,
+            kafka_producer=request_app.app.state.kafka_producer,
         )
 
         result = await agent.ainvoke(

@@ -99,11 +99,11 @@ def increment_tool_iteration(state: AgentState):
     }
 
 
-def create_agent_graph(db, checkpointer=None):
+def create_agent_graph(db, checkpointer=None,   kafka_producer=None,):
 
-    tools = create_all_tools(db)
+    tools = create_all_tools(db, kafka_producer,)
 
-    agent_node = create_agent_node(db)
+    agent_node = create_agent_node(db, kafka_producer,)
     tool_node = ToolNode(tools)
     knowledge_workflow = create_knowledge_node(db)
     transaction_investigation = create_transaction_investigation_node(db)

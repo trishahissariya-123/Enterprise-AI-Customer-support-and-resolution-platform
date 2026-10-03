@@ -12,7 +12,8 @@ from backend.app.services.support_ticket_service import (
 )
 
 
-def create_support_ticket_tools(db: AsyncSession):
+
+def create_support_ticket_tools(db: AsyncSession,   kafka_producer,):
 
     customer_repository = CustomerRepository(db)
     customer_service = CustomerService(customer_repository)
@@ -66,6 +67,20 @@ def create_support_ticket_tools(db: AsyncSession):
             description=description,
             assigned_team=assigned_team,
         )
+        if kafka_producer is not None:
+            await kafka_producer.publish(
+            topic="support-events",
+            event={
+                "event_type": "SUPPORT_TICKET_CREATED",
+                "ticket_id": ticket.ticket_id,
+                "customer_id": customer.customer_id,
+                "category": ticket.category,
+                "priority": ticket.priority,
+                "status": ticket.status,
+                "assigned_team": ticket.assigned_team,
+            },
+        )
+        print("Kafka event published: " "SUPPORT_TICKET_CREATED")
 
         return {
             "created": True,
