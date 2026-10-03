@@ -8,6 +8,9 @@ from backend.app.tools.registry import create_all_tools
 from langchain_core.messages import AIMessage
 from backend.app.infrastructure.redis.client import redis_client
 from backend.app.infrastructure.redis.response_cache import ResponseCache
+from backend.app.core.logging import get_logger
+from backend.app.core.request_context import get_request_id
+logger = get_logger(__name__)
 
 SYSTEM_PROMPT = """
 You are an AI customer support agent for a telecom and digital wallet platform.
@@ -86,6 +89,15 @@ def create_agent_node(db,  kafka_producer=None,):
         allow_write_tools = state.get(
             "allow_write_tools",
             False,
+        )
+        request_id = get_request_id()
+
+        logger.info(
+            "Agent started | request_id=%s | tool_iterations=%s | "
+            "allow_write_tools=%s",
+            request_id,
+            state.get("tool_iterations", 0),
+            allow_write_tools,
         )
         if allow_write_tools:
             tools = read_tools + write_tools
@@ -209,7 +221,11 @@ you MUST call create_support_ticket.
         ]
 
         response = await llm.ainvoke(messages)
-
+        logger.info(
+            "Agent completed | request_id=%s | tool_calls=%s",
+            request_id,
+            len(getattr(response, "tool_calls", []) or []),
+        )
         return {
             "messages": [response]
         }
@@ -219,6 +235,7 @@ you MUST call create_support_ticket.
 
 
 async def triage_node(state: AgentState):
+    request_id = get_request_id()
 
     llm = get_llm()
 
@@ -345,10 +362,14 @@ Customer message:
         [SystemMessage(content=prompt)]
     )
 
-    print("========== TRIAGE ==========")
-    print("Intent:", result.intent.value)
-    print("Reason:", result.reason)
-    print("investigation_required", result.investigation_required)
+    logger.info(
+        "Triage Completed | request_id=%s | intent=%s | "
+        "investigation_required=%s | reason=%s",
+        request_id,
+        result.intent.value,
+        result.investigation_required,
+        result.reason,
+    )
 
     return {
         "intent": result.intent.value,

@@ -137,8 +137,7 @@ async def support_chat(
                 }
             },
         )
-        print("========== GRAPH RESULT ==========")
-        print(result)
+
 
         if "__interrupt__" in result:
             interrupt_data = result["__interrupt__"][0]

@@ -1,3 +1,4 @@
+import time
 from langgraph.graph import END, START, StateGraph
 from langgraph.prebuilt import ToolNode
 from langchain_core.messages import ToolMessage
@@ -25,6 +26,10 @@ from backend.app.agent.ticket_decision import (
 from backend.app.agent.human_approval import (
     human_approval_node,
 )
+from backend.app.core.logging import get_logger
+from backend.app.core.request_context import get_request_id
+
+logger = get_logger(__name__)
 
 def route_after_triage(state: AgentState):
     intent=state.get("intent")
@@ -109,27 +114,99 @@ def create_agent_graph(db, checkpointer=None,   kafka_producer=None,):
     transaction_investigation = create_transaction_investigation_node(db)
     recharge_investigation = create_recharge_investigation_node(db)
     wallet_investigation = create_wallet_investigation_node(db)
-    async def safe_tool_node(state: AgentState):
-        try:
-            result = await tool_node.ainvoke(state)
-            return result
 
-        except Exception as exc:
+    async def safe_tool_node(state: AgentState):
+        request_id = get_request_id()
+
+        last_message = state["messages"][-1]
+        tool_calls = getattr(last_message, "tool_calls", []) or []
+
+        if not tool_calls:
             return {
-                "messages": [
-                    ToolMessage(
-                        content=(
-                            "The requested tool could not be executed. "
-                            "The system encountered a temporary internal error."
-                        ),
-                        tool_call_id=(
-                            state["messages"][-1].tool_calls[0]["id"]
-                            if getattr(state["messages"][-1], "tool_calls", None)
-                            else "unknown"
-                        ),
-                    )
-                ]
+                "messages": []
             }
+
+        tool_messages = []
+
+        for tool_call in tool_calls:
+            tool_name = tool_call["name"]
+            tool = next(
+                (
+                    current_tool
+                    for current_tool in tools
+                    if current_tool.name == tool_name
+                ),
+                None,
+            )
+
+            if tool is None:
+                logger.warning(
+                    "Tool not found | request_id=%s | tool=%s",
+                    request_id,
+                    tool_name,
+                )
+
+                tool_messages.append(
+                    ToolMessage(
+                        content="Requested tool is unavailable.",
+                        tool_call_id=tool_call["id"],
+                    )
+                )
+                continue
+
+            start_time = time.perf_counter()
+
+            logger.info(
+                "Tool started | request_id=%s | tool=%s",
+                request_id,
+                tool_name,
+            )
+
+            try:
+                result = await tool.ainvoke(
+                    tool_call["args"]
+                )
+
+                duration_ms = (
+                                      time.perf_counter() - start_time
+                              ) * 1000
+
+                logger.info(
+                    "Tool completed | request_id=%s | tool=%s | duration_ms=%.2f",
+                    request_id,
+                    tool_name,
+                    duration_ms,
+                )
+
+                tool_messages.append(
+                    ToolMessage(
+                        content=str(result),
+                        tool_call_id=tool_call["id"],
+                    )
+                )
+
+            except Exception:
+                duration_ms = (
+                                      time.perf_counter() - start_time
+                              ) * 1000
+
+                logger.exception(
+                    "Tool failed | request_id=%s | tool=%s | duration_ms=%.2f",
+                    request_id,
+                    tool_name,
+                    duration_ms,
+                )
+
+                tool_messages.append(
+                    ToolMessage(
+                        content="The requested operation could not be completed.",
+                        tool_call_id=tool_call["id"],
+                    )
+                )
+
+        return {
+            "messages": tool_messages,
+        }
 
     graph = StateGraph(AgentState)
 
