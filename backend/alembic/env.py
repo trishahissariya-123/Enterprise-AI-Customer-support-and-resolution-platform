@@ -5,7 +5,7 @@ from sqlalchemy import pool
 
 from alembic import context
 from backend.app.database.base import Base
-from backend.app.models import  Customer, CustomerProfile, KYCRecord, Wallet, Recharge, Transaction, Merchant,MerchantPayment, SupportTicket,TicketMessage, KnowledgeDocument, Conversation
+from backend.app.models import  Customer, CustomerProfile, KYCRecord, Wallet, Recharge, Transaction, Merchant,MerchantPayment, SupportTicket,TicketMessage, KnowledgeDocument, Conversation, LLMUsage
 from backend.app.config import get_settings
 from backend.app import models
 

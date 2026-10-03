@@ -18,6 +18,9 @@ from backend.app.services.conversation_service import (
 )
 from backend.app.core.logging import get_logger
 from backend.app.core.request_context import get_request_id
+from backend.app.repositories.llm_usage_repository import (
+    LLMUsageRepository,
+)
 
 logger = get_logger(__name__)
 
@@ -74,7 +77,7 @@ async def support_chat(
     try:
         # Conversation repository
         conversation_repository = ConversationRepository(db)
-
+        llm_usage_repository = LLMUsageRepository(db)
         # Conversation service
         conversation_service = ConversationService(
             conversation_repository
@@ -157,9 +160,24 @@ async def support_chat(
             result.get("llm_total_tokens", 0),
             result.get("llm_estimated_cost_usd", 0.0),
         )
+        await llm_usage_repository.create(
+            request_id=request_id,
+            conversation_id=conversation.id,
+            customer_id=current_customer.id,
+            model=result.get("model", "openai/gpt-oss-20b"),
+            llm_call_count=result.get("llm_call_count", 0),
+            input_tokens=result.get("llm_input_tokens", 0),
+            output_tokens=result.get("llm_output_tokens", 0),
+            total_tokens=result.get("llm_total_tokens", 0),
+            estimated_cost_usd=result.get(
+                "llm_estimated_cost_usd",
+                0.0,
+            ),
+        )
 
 
         if "__interrupt__" in result:
+            await db.commit()
             interrupt_data = result["__interrupt__"][0]
 
             return {
@@ -200,9 +218,11 @@ async def support_approval(
     context_token = set_current_customer_id(
         current_customer.customer_id
     )
+    request_id = get_request_id()
 
     try:
         conversation_repository = ConversationRepository(db)
+        llm_usage_repository = LLMUsageRepository(db)
         conversation_service = ConversationService(
             conversation_repository
         )
@@ -246,6 +266,37 @@ async def support_approval(
                     "thread_id": conversation.conversation_id
                 }
             },
+        )
+
+
+        await llm_usage_repository.create(
+            request_id=request_id,
+            conversation_id=conversation.id,
+            customer_id=current_customer.id,
+            model=result.get(
+                "model",
+                "openai/gpt-oss-20b",
+            ),
+            llm_call_count=result.get(
+                "llm_call_count",
+                0,
+            ),
+            input_tokens=result.get(
+                "llm_input_tokens",
+                0,
+            ),
+            output_tokens=result.get(
+                "llm_output_tokens",
+                0,
+            ),
+            total_tokens=result.get(
+                "llm_total_tokens",
+                0,
+            ),
+            estimated_cost_usd=result.get(
+                "llm_estimated_cost_usd",
+                0.0,
+            ),
         )
 
         if "__interrupt__" in result:
