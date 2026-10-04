@@ -11,7 +11,11 @@ from backend.app.services.support_ticket_service import (
     SupportTicketService,
 )
 
+import json
 
+from backend.app.repositories.outbox_event_repository import (
+    OutboxEventRepository,
+)
 
 def create_support_ticket_tools(db: AsyncSession,   kafka_producer,):
 
@@ -20,6 +24,7 @@ def create_support_ticket_tools(db: AsyncSession,   kafka_producer,):
 
     ticket_repository = SupportTicketRepository(db)
     ticket_service = SupportTicketService(ticket_repository)
+    outbox_repository = OutboxEventRepository(db)
 
     @tool
     async def create_support_ticket(
@@ -67,20 +72,21 @@ def create_support_ticket_tools(db: AsyncSession,   kafka_producer,):
             description=description,
             assigned_team=assigned_team,
         )
-        if kafka_producer is not None:
-            await kafka_producer.publish(
+        event = {
+            "event_type": "SUPPORT_TICKET_CREATED",
+            "ticket_id": ticket.ticket_id,
+            "customer_id": customer.customer_id,
+            "category": ticket.category,
+            "priority": ticket.priority,
+            "status": ticket.status,
+            "assigned_team": ticket.assigned_team,
+        }
+
+        await outbox_repository.create(
+            event_type="SUPPORT_TICKET_CREATED",
             topic="support-events",
-            event={
-                "event_type": "SUPPORT_TICKET_CREATED",
-                "ticket_id": ticket.ticket_id,
-                "customer_id": customer.customer_id,
-                "category": ticket.category,
-                "priority": ticket.priority,
-                "status": ticket.status,
-                "assigned_team": ticket.assigned_team,
-            },
+            payload=json.dumps(event),
         )
-        print("Kafka event published: " "SUPPORT_TICKET_CREATED")
 
         return {
             "created": True,

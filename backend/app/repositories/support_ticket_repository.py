@@ -40,8 +40,7 @@ class SupportTicketRepository:
         ticket: SupportTicket,
     ) -> SupportTicket:
         self.db.add(ticket)
+        await self.db.flush()
 
-        await self.db.commit()
-        await self.db.refresh(ticket)
 
         return ticket

@@ -3,6 +3,7 @@ from backend.app.models.customer_profile import  CustomerProfile
 from backend.app.models.knowledge_document import KnowledgeDocument
 from backend.app.models.kyc import  KYCRecord
 from backend.app.models.llm_usage import LLMUsage
+from backend.app.models.outbox_event import OutboxEvent
 from backend.app.models.wallet import Wallet
 from backend.app.models.recharge import Recharge
 from backend.app.models.transaction import Transaction
@@ -13,4 +14,4 @@ from backend.app.models.ticket_message import TicketMessage
 from backend.app.models.conversation import  Conversation
 
 __all__=["CustomerProfile", "Customer","KYCRecord", "Wallet", "Recharge","Transaction",  "Merchant",
-    "MerchantPayment",   "SupportTicket","TicketMessage","KnowledgeDocument","Conversation","LLMUsage"]
+    "MerchantPayment",   "SupportTicket","TicketMessage","KnowledgeDocument","Conversation","LLMUsage","OutboxEvent"]

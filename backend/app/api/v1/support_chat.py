@@ -148,6 +148,8 @@ async def support_chat(
             },
         )
 
+        print("Result Value from create_agent_graph graph....................,", result)
+
         logger.info(
             "LLM usage summary | request_id=%s | "
             "llm_call_count=%s | input_tokens=%s | "
